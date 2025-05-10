@@ -1,0 +1,24 @@
+name: Sync all German laws
+on:
+  schedule:            # täglich 03:30 Uhr Berlin   (= 01:30 UTC)
+    - cron: '30 1 * * *'
+  workflow_dispatch:   # manuell auslösbar
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360        # bis zu 6 h; ausreichend für >6 000 Gesetze
+    permissions:
+      contents: write           # erlaubt Push mit GITHUB_TOKEN :contentReference[oaicite:1]{index=1}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python scripts/update_all.py
+      - name: Push back
+        run: git push
+        if: success()           # wird nur ausgeführt, wenn das Skript fehlerfrei lief
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
