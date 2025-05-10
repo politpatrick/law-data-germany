@@ -1,0 +1,24 @@
+name: Update German Laws
+on:
+  schedule:                # täglich 03:30 Uhr Berlin (01:30 UTC)
+    - cron: '30 1 * * *'
+  workflow_dispatch:       # manuelles Anstoßen
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run converter
+        run: python scripts/update.py
+      - name: Push changes
+        if: github.repository_owner == github.actor   # Schutz vor Forks
+        run: |
+          git push origin HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
