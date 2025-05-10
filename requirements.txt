@@ -1,0 +1,3 @@
+# requirements.txt
+xmltodict==0.13.0   # XML → Python-Dict
+requests==2.31.0    # HTTP-Abruf der XML-Dateien
