@@ -1,0 +1,561 @@
+openapi: 3.1.0
+
+info:
+  title: PolitPatrick Law API (via GitHub Pages)
+  version: "1.6.3"
+  description: |
+    Statisch gehostete JSON-Daten aus **Gesetze-im-Internet**
+    Basis-URL: `https://politpatrick.github.io/law-data-germany`
+
+servers:
+  - url: https://politpatrick.github.io/law-data-germany
+    description: GitHub-Pages-CDN
+
+paths:
+
+  /data/index.json:
+    get:
+      operationId: listOrFindLaw
+      summary: Rückgabe der gesamten Liste oder (gefiltert) eines einzelnen Gesetzes
+      tags: [law]
+      parameters:
+        - name: code
+          in: query
+          required: false
+          description: Gesetzeskürzel (z. B. `bgb`). Fehlt der Parameter, wird die komplette Liste zurückgegeben.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array mit Metadatensätzen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LawSummary'
+        '404':
+          description: Gesetz nicht gefunden (nur wenn `code` gesetzt war)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/{code}.json:
+    get:
+      operationId: getLaw
+      summary: Liefert das komplette Gesetz als JSON-Dump
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel, z. B. `stgb`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vollständiger Gesetzes-Dump
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LawFile'
+        '404':
+          description: Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/paragraphs/{code}/{paragraphId}.json:
+    get:
+      operationId: getParagraph
+      summary: Einzelnen Paragraphen abrufen
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel, z. B. `bgb`
+          schema:
+            type: string
+        - name: paragraphId
+          in: path
+          required: true
+          description: Paragraph-ID, z. B. `242`, `90a`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Gefundener Paragraph
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Paragraph'
+        '404':
+          description: Paragraph oder Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/paragraphs/{code}.json:
+    get:
+      operationId: list_sections
+      summary: Listet alle Normen/Abschnitte eines bestimmten Gesetzes auf
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel, z. B. `bgb`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array mit Abschnitts-Metadaten
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SectionSummary'
+        '404':
+          description: Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/{code}/metadata.json:
+    get:
+      operationId: get_law_metadata
+      summary: Liefert Meta-Informationen zu einem Gesetz
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel, z. B. `stgb`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadaten des Gesetzes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LawMetadata'
+        '404':
+          description: Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /search:
+    get:
+      operationId: search_in_laws
+      summary: Durchsucht alle Gesetze oder ausgewählte nach Suchbegriff und gibt Fundstellen zurück
+      tags: [law]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Suchbegriff
+          schema:
+            type: string
+        - name: law_keys
+          in: query
+          required: false
+          description: Liste von Gesetzeskürzeln, optional, um Suche einzuschränken
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Liste von Fundstellen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+        '400':
+          description: Fehlender oder ungültiger Suchbegriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/updates.json:
+    get:
+      operationId: get_laws_updated_since
+      summary: Zeigt alle Gesetze, die seit einem Datum geändert wurden
+      tags: [law]
+      parameters:
+        - name: since
+          in: query
+          required: true
+          description: Datum im Format `YYYY-MM-DD`
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Liste geänderter Gesetze (Metadaten)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LawMetadata'
+        '400':
+          description: Ungültiges Datum
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/summaries/{code}.json:
+    get:
+      operationId: summarize_law
+      summary: Gibt eine Kurzfassung eines Gesetzes oder einzelner Abschnitte aus
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel
+          schema:
+            type: string
+        - name: norm_id
+          in: query
+          required: false
+          description: Norm-ID für gezielte Zusammenfassung (z. B. `§242`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Zusammenfassungstext
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Summary'
+        '404':
+          description: Gesetz oder Norm nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/diff/{code}.json:
+    get:
+      operationId: compare_versions
+      summary: Vergleicht zwei Versionen eines Gesetzesabschnitts und hebt Änderungen hervor
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Gesetzeskürzel
+          schema:
+            type: string
+        - name: norm_id
+          in: query
+          required: true
+          description: Norm-ID
+          schema:
+            type: string
+        - name: date1
+          in: query
+          required: true
+          description: Erstes Datum (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: date2
+          in: query
+          required: true
+          description: Zweites Datum (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Textliche Unterschiede
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diff'
+        '400':
+          description: Fehlende oder ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/translate/{code}/{paragraphId}.json:
+    post:
+      operationId: translate_paragraph
+      summary: Übersetzt einen Absatz in eine andere Sprache
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: paragraphId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: target_lang
+          in: query
+          required: true
+          description: Ziel-Sprache (z. B. `en`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Übersetzter Text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranslatedParagraph'
+        '400':
+          description: Fehlende oder ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/cross_references/{code}.json:
+    get:
+      operationId: list_cross_references
+      summary: Listet innerhalb eines Gesetzes alle Querverweise auf
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste von Querverweisen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CrossReference'
+        '404':
+          description: Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /data/amendments/{code}.json:
+    get:
+      operationId: get_amendment_history
+      summary: Gibt die Änderungs‐Historie eines Gesetzes aus
+      tags: [law]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Änderungs‐Einträge
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AmendmentEntry'
+        '404':
+          description: Gesetz nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+
+    LawSummary:
+      type: object
+      required:
+        - code
+        - title
+        - link
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          example: bgb
+        title:
+          type: string
+          example: Bürgerliches Gesetzbuch
+        link:
+          type: string
+          format: uri
+          example: https://politpatrick.github.io/law-data-germany/data/bgb.json
+
+    LawFile:
+      description: Vollständiger Gesetzes-Dump – Struktur richtet sich nach dem Original-XML.
+      type: object
+      properties: {}
+      additionalProperties: true
+
+    Paragraph:
+      type: object
+      required:
+        - id
+        - heading
+        - text
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: "242"
+        heading:
+          type: string
+          example: Diebstahl
+        text:
+          type: string
+          example: Wer eine fremde bewegliche Sache [...]
+
+    Error:
+      type: object
+      required:
+        - error
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          example: Gesetz nicht gefunden.
+
+    SectionSummary:
+      type: object
+      required:
+        - norm_id
+        - heading
+      additionalProperties: false
+      properties:
+        norm_id:
+          type: string
+          example: "§242"
+        heading:
+          type: string
+          example: Diebstahl
+
+    SearchResult:
+      type: object
+      required:
+        - law_key
+        - norm_id
+        - paragraph_id
+        - snippet
+      additionalProperties: false
+      properties:
+        law_key:
+          type: string
+          example: bgb
+        norm_id:
+          type: string
+          example: "§242"
+        paragraph_id:
+          type: string
+          example: "1"
+        snippet:
+          type: string
+          example: "...einer fremden beweglichen Sache..."
+
+    LawMetadata:
+      type: object
+      required:
+        - title
+        - ausfertigung
+        - last_changed
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          example: Bürgerliches Gesetzbuch
+        ausfertigung:
+          type: string
+          format: date
+          example: "1896-01-01"
+        last_changed:
+          type: string
+          format: date
+          example: "2025-04-30"
+        fundstelle:
+          type: string
+          example: BGBl. I S. 1
+
+    Summary:
+      type: object
+      required:
+        - summary
+      additionalProperties: false
+      properties:
+        summary:
+          type: string
+          example: Dieses Gesetz regelt in fünf Büchern das bürgerliche Recht...
+
+    Diff:
+      type: object
+      required:
+        - diffs
+      additionalProperties: false
+      properties:
+        diffs:
+          type: string
+          example: "- Alter Absatztext… + Neuer Absatztext…"
+
+    TranslatedParagraph:
+      type: object
+      required:
+        - translated_text
+      additionalProperties: false
+      properties:
+        translated_text:
+          type: string
+          example: Whoever takes...
+
+    CrossReference:
+      type: object
+      required:
+        - from
+        - to
+      additionalProperties: false
+      properties:
+        from:
+          type: string
+          example: §242
+        to:
+          type: string
+          example: §249
+
+    AmendmentEntry:
+      type: object
+      required:
+        - date
+        - description
+      additionalProperties: false
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2025-04-30"
+        description:
+          type: string
+          example: Neufassung von Absatz 2
