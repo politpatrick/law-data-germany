@@ -27,46 +27,62 @@ import requests
 import xmltodict
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from requests.exceptions import RequestException, ConnectTimeout, ReadTimeout
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 # Konstante Pfade
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 BASE = pathlib.Path(__file__).resolve().parent
 DATA = BASE.parent / "data"
 DATA.mkdir(exist_ok=True)
 
 TOC_URL = "https://www.gesetze-im-internet.de/gii-toc.xml"
 
-# ──────────────────────────────────────────────────────────────────────────────
-# HTTP-Session mit Retry
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
+# HTTP-Session mit Retry für Connection Timeouts
+# ────────────────────────────────────────────────────────────────────
 session = requests.Session()
 session.mount(
     "https://",
     HTTPAdapter(
         max_retries=Retry(
             total=5,
-            backoff_factor=1,
+            backoff_factor=1.5,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["GET"],
             raise_on_status=False,
+            connect=5,  # Retry auf Connection Errors
+            read=5,     # Retry auf Read Errors
         ),
     ),
 )
 
 
-def get(url: str) -> bytes:
-    """GET mit großzügigem Timeout + Retry-Session"""
-    return session.get(url, timeout=(30, 120)).content
+def get(url: str, retries: int = 3) -> bytes:
+    """GET mit großzügigem Timeout + Retry-Session für Connection Errors"""
+    for attempt in range(retries):
+        try:
+            response = session.get(url, timeout=(30, 120))
+            response.raise_for_status()
+            return response.content
+        except (ConnectTimeout, ReadTimeout, RequestException) as e:
+            if attempt < retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                print(f"  ⚠️  Versuch {attempt + 1}/{retries} fehlgeschlagen: {type(e).__name__}")
+                print(f"     Warte {wait_time}s vor erneutem Versuch…")
+                import time
+                time.sleep(wait_time)
+            else:
+                raise
 
 
 def sha1(b: bytes) -> str:
     return hashlib.sha1(b).hexdigest()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 # Paragraph-Extraktion (speziell für GiI-XML)
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 PARA_ID_RE = re.compile(r"§\s*([0-9]+[a-zA-Z0-9]*)")
 
 
@@ -129,9 +145,9 @@ def export_paragraphs(code: str, xml_bytes: bytes) -> bool:
     return changed
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 # Haupt-Routine
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 def main() -> bool:
     changed_any = False
 
@@ -178,9 +194,9 @@ def main() -> bool:
     return changed_any
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 # Git-Commit & Exit
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     try:
         updated = main()
